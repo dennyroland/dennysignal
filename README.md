@@ -21,3 +21,9 @@ npm run validate
 正式站台：<https://denny.usdollar.win>
 
 > 僅供資訊參考，不構成投資建議。
+
+## Flask 美股 MACD 掃描版
+
+最後本機版本的 Flask/PWA 掃描器位於 [`flask-scanner/`](flask-scanner/)，與既有 Cloudflare Worker 並存。請依照 [Flask 掃描器說明](flask-scanner/README.md) 在本機啟動。Worker 的現有自動部署流程維持原樣。
+
+Flask 版行情使用 yfinance，支援持股與訊號掃描；Google Sheet ID 放在本機 `.env`，持股資料存在本機 SQLite。不要提交 `.env` 或資料庫檔案。

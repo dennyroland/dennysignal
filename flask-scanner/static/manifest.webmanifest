@@ -1,0 +1,11 @@
+{
+  "name": "美股 MACD 持股提醒",
+  "short_name": "MACD 持股",
+  "description": "追蹤美股持股與 MACD 訊號",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#101b2d",
+  "lang": "zh-Hant",
+  "icons": [{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
