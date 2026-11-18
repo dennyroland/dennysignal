@@ -11,6 +11,7 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import yfinance as yf
@@ -31,7 +32,19 @@ def parse_args() -> argparse.Namespace:
 
 
 def yahoo_symbol(symbol: str) -> str:
-    return symbol.replace(".", "-")
+    return symbol.replace(".", "-").replace("/", "-")
+
+
+def remove_incomplete_session(prices: pd.DataFrame) -> pd.DataFrame:
+    """Ignore today's Yahoo daily bar until the regular US session is complete."""
+    if prices.empty:
+        return prices
+    now_new_york = datetime.now(ZoneInfo("America/New_York"))
+    latest_date = pd.Timestamp(prices.index[-1]).date()
+    market_close_buffer = now_new_york.replace(hour=16, minute=15, second=0, microsecond=0)
+    if latest_date == now_new_york.date() and now_new_york < market_close_buffer:
+        return prices.iloc[:-1]
+    return prices
 
 
 def ticker_frame(download: pd.DataFrame, ticker: str) -> pd.DataFrame | None:
@@ -82,6 +95,7 @@ def scan_stock(stock: dict, frame: pd.DataFrame) -> tuple[dict | None, dict]:
     prices["Volume"] = pd.to_numeric(prices["Volume"], errors="coerce")
     prices = prices.dropna(subset=["Close", "Volume"])
     prices = prices[prices["Volume"] >= 0]
+    prices = remove_incomplete_session(prices)
     if len(prices) < OBSERVATION_DAYS:
         raise ValueError(f"only {len(prices)} valid daily rows")
 
