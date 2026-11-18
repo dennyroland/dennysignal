@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   scan:
-    name: Scan Top 200 for MACD and volume radar signals
+    name: Scan Top 500 for MACD and volume radar signals
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
