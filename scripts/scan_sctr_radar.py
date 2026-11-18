@@ -11,6 +11,7 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -143,6 +144,7 @@ def scan_stock(stock: dict, frame: pd.DataFrame) -> tuple[dict | None, dict]:
     result = {
         "sctrRank": int(stock["rank"]),
         "symbol": stock["symbol"],
+        "stockchartsUrl": f"https://stockcharts.com/sc3/ui/?s={quote(stock['symbol'], safe='')}",
         "name": stock.get("name", ""),
         "sector": stock.get("sector", ""),
         "industry": stock.get("industry", ""),
@@ -174,6 +176,7 @@ def write_outputs(output_dir: Path, report: dict) -> None:
     fields = [
         "sctrRank",
         "symbol",
+        "stockchartsUrl",
         "name",
         "sector",
         "industry",
@@ -208,16 +211,17 @@ def write_outputs(output_dir: Path, report: dict) -> None:
         f"- Volume matches: {report['volumeMatchCount']}",
         f"- Final matches: {report['resultCount']}",
         "",
-        "| SCTR rank | Symbol | SCTR | Cross date | Days | Volume percentile | Close |",
-        "| ---: | :--- | ---: | :--- | ---: | ---: | ---: |",
+        "| SCTR rank | Symbol | StockCharts | SCTR | Cross date | Days | Volume percentile | Close |",
+        "| ---: | :--- | :--- | ---: | :--- | ---: | ---: | ---: |",
     ]
     lines.extend(
-        f"| {row['sctrRank']} | {row['symbol']} | {row['sctr']:.1f} | {row['crossDate']} | "
+        f"| {row['sctrRank']} | {row['symbol']} | [Chart]({row['stockchartsUrl']}) | "
+        f"{row['sctr']:.1f} | {row['crossDate']} | "
         f"{row['daysSinceCross']} | {row['volumePercentile60D']:.1f}% | {row['close']:.2f} |"
         for row in report["results"]
     )
     if not report["results"]:
-        lines.append("| — | No stocks matched all conditions | — | — | — | — | — |")
+        lines.append("| — | No stocks matched all conditions | — | — | — | — | — | — |")
     lines.append("")
     markdown = "\n".join(lines)
     markdown_path.write_text(markdown + "\n")
