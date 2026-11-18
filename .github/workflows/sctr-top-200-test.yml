@@ -1,0 +1,33 @@
+name: SCTR Top 200 Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-and-validate:
+    name: Fetch and validate Large-Cap EOD Top 200
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Fetch and validate SCTR Top 200
+        run: node scripts/fetch-sctr-top200.mjs artifacts/sctr-top-200
+
+      - name: Upload JSON and CSV result
+        uses: actions/upload-artifact@v4
+        with:
+          name: sctr-top-200-test
+          path: artifacts/sctr-top-200/
+          if-no-files-found: error
+          retention-days: 14
