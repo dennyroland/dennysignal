@@ -3,7 +3,11 @@ import path from "node:path";
 
 const SOURCE_URL = "https://stockcharts.com/data/sp500-SCTR.json";
 const OUTPUT_DIR = path.resolve(process.argv[2] || "artifacts/sctr-top-200");
-const EXPECTED_COUNT = 200;
+const TARGET_COUNT = Number(process.argv[3] || 200);
+
+if (!Number.isInteger(TARGET_COUNT) || TARGET_COUNT < 1 || TARGET_COUNT > 2_000) {
+  throw new Error(`Invalid SCTR target count: ${process.argv[3]}`);
+}
 
 const response = await fetch(SOURCE_URL, {
   headers: {
@@ -49,17 +53,17 @@ for (const row of ranked) {
   unique.push(row);
 }
 
-const top200 = unique.slice(0, EXPECTED_COUNT).map((row, index) => ({
+const selected = unique.slice(0, TARGET_COUNT).map((row, index) => ({
   rank: index + 1,
   ...row,
 }));
 
-if (top200.length !== EXPECTED_COUNT) {
-  throw new Error(`Expected ${EXPECTED_COUNT} unique symbols but received ${top200.length}`);
+if (selected.length !== TARGET_COUNT) {
+  throw new Error(`Expected ${TARGET_COUNT} unique symbols but received ${selected.length}`);
 }
 
-for (let index = 1; index < top200.length; index += 1) {
-  if (top200[index].sctr > top200[index - 1].sctr) {
+for (let index = 1; index < selected.length; index += 1) {
+  if (selected[index].sctr > selected[index - 1].sctr) {
     throw new Error(`SCTR order validation failed at rank ${index + 1}`);
   }
 }
@@ -71,8 +75,8 @@ const result = {
   timeframe: "End-of-Day",
   sourceTime: String(source.time || ""),
   generatedAt,
-  count: top200.length,
-  stocks: top200,
+  count: selected.length,
+  stocks: selected,
 };
 
 const csvFields = [
@@ -97,35 +101,36 @@ function csvValue(value) {
 
 const csv = [
   csvFields.join(","),
-  ...top200.map((row) => csvFields.map((field) => csvValue(row[field])).join(",")),
+  ...selected.map((row) => csvFields.map((field) => csvValue(row[field])).join(",")),
 ].join("\n");
 
 await mkdir(OUTPUT_DIR, { recursive: true });
+const outputBase = `sctr-top-${TARGET_COUNT}`;
 await Promise.all([
-  writeFile(path.join(OUTPUT_DIR, "sctr-top-200.json"), `${JSON.stringify(result, null, 2)}\n`),
-  writeFile(path.join(OUTPUT_DIR, "sctr-top-200.csv"), `${csv}\n`),
+  writeFile(path.join(OUTPUT_DIR, `${outputBase}.json`), `${JSON.stringify(result, null, 2)}\n`),
+  writeFile(path.join(OUTPUT_DIR, `${outputBase}.csv`), `${csv}\n`),
 ]);
 
-const preview = top200
+const preview = selected
   .slice(0, 10)
   .map((row) => `${String(row.rank).padStart(3)}  ${row.symbol.padEnd(6)}  ${row.sctr.toFixed(1)}`)
   .join("\n");
 
-console.log(`Validated ${top200.length} unique Large-Cap EOD SCTR symbols.`);
+console.log(`Validated ${selected.length} unique Large-Cap EOD SCTR symbols.`);
 console.log(`StockCharts report time: ${result.sourceTime || "not supplied"}`);
 console.log("\nTop 10:\n" + preview);
 
 if (process.env.GITHUB_STEP_SUMMARY) {
   const summary = [
-    "# SCTR Top 200 test",
+    `# SCTR Top ${TARGET_COUNT} test`,
     "",
     `- Source time: ${result.sourceTime || "not supplied"}`,
     `- Generated at: ${generatedAt}`,
-    `- Validated symbols: ${top200.length}`,
+    `- Validated symbols: ${selected.length}`,
     "",
     "| Rank | Symbol | SCTR | Name |",
     "| ---: | :--- | ---: | :--- |",
-    ...top200.slice(0, 20).map((row) => `| ${row.rank} | ${row.symbol} | ${row.sctr.toFixed(1)} | ${row.name} |`),
+    ...selected.slice(0, 20).map((row) => `| ${row.rank} | ${row.symbol} | ${row.sctr.toFixed(1)} | ${row.name} |`),
     "",
     "The complete JSON and CSV files are attached to this workflow run as an artifact.",
   ].join("\n");

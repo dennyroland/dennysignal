@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scan the SCTR Top 200 for recent bullish MACD histogram turns and volume spikes."""
+"""Scan the SCTR leaders for recent bullish MACD histogram turns and volume strength."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ import yfinance as yf
 
 OBSERVATION_DAYS = 60
 SIGNAL_LOOKBACK_DAYS = 10
-VOLUME_Z_THRESHOLD = 2.0
+VOLUME_PERCENTILE = 0.80
 DOWNLOAD_PERIOD = "1y"
 CHUNK_SIZE = 50
 
@@ -119,9 +119,10 @@ def scan_stock(stock: dict, frame: pd.DataFrame) -> tuple[dict | None, dict]:
     volume_mean = float(observed["Volume"].mean())
     volume_std = float(observed["Volume"].std(ddof=0))
     latest_volume = float(latest["Volume"])
-    volume_threshold = volume_mean + VOLUME_Z_THRESHOLD * volume_std
+    volume_threshold = float(observed["Volume"].quantile(VOLUME_PERCENTILE))
     volume_zscore = (latest_volume - volume_mean) / volume_std if volume_std > 0 else 0.0
-    volume_match = volume_zscore > VOLUME_Z_THRESHOLD
+    volume_percentile = float((observed["Volume"] <= latest_volume).mean() * 100)
+    volume_match = latest_volume > volume_threshold
 
     cross_date = None
     days_since_cross = None
@@ -157,6 +158,7 @@ def scan_stock(stock: dict, frame: pd.DataFrame) -> tuple[dict | None, dict]:
         "volumeMean60D": int(round(volume_mean)),
         "volumeStdDev60D": int(round(volume_std)),
         "volumeThreshold": int(round(volume_threshold)),
+        "volumePercentile60D": round(volume_percentile, 1),
         "volumeZScore": round(volume_zscore, 3),
     }
     return result, diagnostics
@@ -187,6 +189,7 @@ def write_outputs(output_dir: Path, report: dict) -> None:
         "volumeMean60D",
         "volumeStdDev60D",
         "volumeThreshold",
+        "volumePercentile60D",
         "volumeZScore",
     ]
     with csv_path.open("w", newline="") as handle:
@@ -205,12 +208,12 @@ def write_outputs(output_dir: Path, report: dict) -> None:
         f"- Volume matches: {report['volumeMatchCount']}",
         f"- Final matches: {report['resultCount']}",
         "",
-        "| SCTR rank | Symbol | SCTR | Cross date | Days | Volume z | Close |",
+        "| SCTR rank | Symbol | SCTR | Cross date | Days | Volume percentile | Close |",
         "| ---: | :--- | ---: | :--- | ---: | ---: | ---: |",
     ]
     lines.extend(
         f"| {row['sctrRank']} | {row['symbol']} | {row['sctr']:.1f} | {row['crossDate']} | "
-        f"{row['daysSinceCross']} | {row['volumeZScore']:.3f} | {row['close']:.2f} |"
+        f"{row['daysSinceCross']} | {row['volumePercentile60D']:.1f}% | {row['close']:.2f} |"
         for row in report["results"]
     )
     if not report["results"]:
@@ -229,8 +232,9 @@ def main() -> None:
     args = parse_args()
     sctr = json.loads(args.sctr_json.read_text())
     stocks = sctr.get("stocks", [])
-    if len(stocks) != 200:
-        raise ValueError(f"expected 200 SCTR targets, received {len(stocks)}")
+    target_count = int(sctr.get("count", 0))
+    if target_count < 1 or len(stocks) != target_count:
+        raise ValueError(f"expected {target_count} SCTR targets, received {len(stocks)}")
 
     frames: dict[str, pd.DataFrame] = {}
     download_errors: list[str] = []
@@ -274,18 +278,22 @@ def main() -> None:
             results.append(result)
 
     results.sort(key=lambda row: (row["sctrRank"], -row["volumeZScore"]))
-    if valid_target_count < 180:
-        raise RuntimeError(f"only {valid_target_count}/200 symbols returned valid yfinance data")
+    required_valid_count = math.ceil(target_count * 0.90)
+    if valid_target_count < required_valid_count:
+        raise RuntimeError(
+            f"only {valid_target_count}/{target_count} symbols returned valid yfinance data; "
+            f"required at least {required_valid_count}"
+        )
 
     report = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "sctrSourceTime": sctr.get("sourceTime", ""),
         "marketDate": max(market_dates) if market_dates else None,
         "definition": {
-            "universe": "StockCharts Large-Cap SCTR Top 200",
+            "universe": f"StockCharts Large-Cap SCTR Top {target_count}",
             "observationTradingDays": OBSERVATION_DAYS,
             "histogramRule": "current MACD histogram > 0 and latest negative-to-positive cross occurred within 10 trading days",
-            "volumeRule": "latest daily volume > 60D mean + 2 population standard deviations",
+            "volumeRule": "latest daily volume > 80th percentile of the latest 60 complete trading days",
         },
         "targetCount": len(stocks),
         "validTargetCount": valid_target_count,
@@ -297,7 +305,7 @@ def main() -> None:
     }
     write_outputs(args.output_dir, report)
     print(
-        f"Scanned {valid_target_count}/200 symbols; "
+        f"Scanned {valid_target_count}/{target_count} symbols; "
         f"histogram={histogram_match_count}, volume={volume_match_count}, final={len(results)}"
     )
     for row in results:

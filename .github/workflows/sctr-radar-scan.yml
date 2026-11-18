@@ -21,8 +21,8 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Fetch and validate SCTR Top 200
-        run: node scripts/fetch-sctr-top200.mjs artifacts/sctr-radar
+      - name: Fetch and validate SCTR Top 500
+        run: node scripts/fetch-sctr-top200.mjs artifacts/sctr-radar 500
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,7 +37,7 @@ jobs:
       - name: Scan yfinance market data
         run: >-
           python scripts/scan_sctr_radar.py
-          --sctr-json artifacts/sctr-radar/sctr-top-200.json
+          --sctr-json artifacts/sctr-radar/sctr-top-500.json
           --output-dir artifacts/sctr-radar
 
       - name: Upload radar result
