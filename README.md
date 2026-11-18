@@ -4,13 +4,12 @@
 
 ## 訊號規則
 
-- GREEN：MACD 線由零軸下方穿越到零軸上方
-- RED：MACD 線由零軸上方跌破零軸
-- YELLOW：MACD 線由下往上穿越訊號線（黃金交叉）
-- BLACK：MACD 線由上往下跌破訊號線（死亡交叉）
-- BLUE：最新交易日沒有新交叉，持續監測
+- GREEN：MACD 黑線位於零軸以上
+- RED：MACD 黑線位於零軸以下
+- YELLOW：MACD 黑線位於 SIGNAL 紅線以上
+- BLACK：MACD 黑線位於 SIGNAL 紅線以下
 
-MACD = EMA(12) - EMA(26)，訊號線 = MACD 的 EMA(9)。同日同時觸發時，零軸事件優先於訊號線交叉事件。
+每檔股票會同時顯示一個零軸燈號（GREEN／RED）與一個線位燈號（YELLOW／BLACK）。MACD = EMA(12) - EMA(26)，SIGNAL = MACD 的 EMA(9)。日 K 與 MACD 圖之間顯示每日成交量，顏色與同日 K 線一致。
 
 ## 開發與驗證
 
